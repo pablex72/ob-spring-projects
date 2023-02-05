@@ -2,6 +2,8 @@ package com.example.obrestdatajpa.controller;
 
 import com.example.obrestdatajpa.entities.Book;
 import com.example.obrestdatajpa.repository.BookRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +15,7 @@ import java.util.Optional;
 public class BookController {
 
     //atributos
+    private final Logger log = LoggerFactory.getLogger(BookController.class);
 
     private BookRepository bookRepository;
     //constructores
@@ -59,20 +62,60 @@ public class BookController {
     // crear un nuevo libo en base de datos
     // metodo POST, no colisiona con findAll porque son diferentes metodos HTTP: GET vs POST
     @PostMapping("/api/books/")
-    public Book create(@RequestBody Book book, @RequestHeader HttpHeaders headers){
+    public ResponseEntity<Book> create(@RequestBody Book book, @RequestHeader HttpHeaders headers){
         System.out.println(headers.get("User-Agent"));
         //guadar el libro recibio por parametro en la base de datos
-        return bookRepository.save(book); // el libro devuelto tiene una clave primary
+        // si todo va bien en el if no se entra
+        if(book.getId() != null){
+            log.warn("trying to create a book with id");
+            System.out.println("trying to create a book with id");
+            return ResponseEntity.badRequest().build();
+        }
+        Book result = bookRepository.save(book);
+        return ResponseEntity.ok(result); // el libro devuelto tiene una clave primary
     }
 
 
 
     //actualizar un libro  existente en base de datos
     @PutMapping("/api/books")
-    public Book update(@RequestBody Book book){
-        return book;
+    public ResponseEntity<Book> update(@RequestBody Book book){
+        if(book.getId() == null){ //si no tiene id quiere decir que si es una creacion
+            log.warn("Trying to update a non existent book no id provided ");
+            //return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().build(); //400 mala peticion
+        }
+        if(!bookRepository.existsById(book.getId())){ //si no tiene id quiere decir que si es una creacion
+            log.warn("Trying to update a non existent book no id provided, the book no exist"); //404 not found
+            //return ResponseEntity.badRequest().build();
+            return ResponseEntity.notFound().build();
+        }
+
+        //el proceso de actualizacion
+        Book result = bookRepository.save(book);
+        return ResponseEntity.ok(result);
     }
 
     // borrar un libro en base de datos
+    @DeleteMapping("/api/books/{id}")
+    public ResponseEntity<Book> delete(@PathVariable Long id){
+
+        if(!bookRepository.existsById(id)){ //si no tiene id quiere decir que si es una creacion
+            log.warn("Trying to delete a non existent book no id provided, the book no exist"); //404 not found
+            //return ResponseEntity.badRequest().build();
+            return ResponseEntity.notFound().build();
+        }
+
+        bookRepository.deleteById(id);
+        return ResponseEntity.noContent().build(); //se borro correctamente tipo 200 para adelante
+    }
+
+    @DeleteMapping("/api/books")
+    public ResponseEntity<Book> deleteAll(){
+        log.info("Request Deleting all books");
+        bookRepository.deleteAll();
+        return ResponseEntity.noContent().build();
+
+    }
 
 }
